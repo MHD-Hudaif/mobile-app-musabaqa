@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kauzariyya Musabaqa</string>
+    <string name="title_activity_main">Kauzariyya Musabaqa</string>
+    <string name="package_name">com.kauzariyya.musabaqa</string>
+    <string name="custom_url_scheme">com.kauzariyya.musabaqa</string>
+</resources>
