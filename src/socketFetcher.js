@@ -6,7 +6,6 @@
 export class LiveSocketFetcher {
     constructor(apiBaseUrl = 'https://musabaqa.kauzariyya.com') {
         this.apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
-        this.localBaseUrl = (window.location.origin + '/kauzariyya-musabaqa').replace(/\/+$/, '');
         this.eventSource = null;
         this.pollingTimer = null;
         this.isConnected = false;
@@ -62,10 +61,7 @@ export class LiveSocketFetcher {
         if (this.pollingTimer) return;
         this.pollingTimer = setInterval(async () => {
             try {
-                let res = await fetch(`${this.apiBaseUrl}/api/admin-scoreboard.php?t=${Date.now()}`).catch(() => null);
-                if (!res || !res.ok) {
-                    res = await fetch(`${this.localBaseUrl}/api/admin-scoreboard.php?t=${Date.now()}`);
-                }
+                const res = await fetch(`${this.apiBaseUrl}/api/admin-scoreboard.php?t=${Date.now()}`);
                 if (!res.ok) throw new Error('Polling failed');
                 const data = await res.json();
                 if (data.ok) {
