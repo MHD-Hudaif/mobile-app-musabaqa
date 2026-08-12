@@ -1,5 +1,9 @@
 {
   "appId": "com.kauzariyya.musabaqa",
   "appName": "Kauzariyya Musabaqa",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://musabaqa.kauzariyya.com/live-display-mobile",
+    "errorPath": "error.html"
+  }
 }
