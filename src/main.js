@@ -3,10 +3,14 @@ import { LiveSocketFetcher } from './socketFetcher.js';
 import { fetchAdminScoreboard } from './api.js';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { App } from '@capacitor/app';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+
+const BUILTIN_WEB_VERSION = '1.0.0';
 
 // Application State
 const state = {
     view: 'home', // 'home' | 'scoreboard' | 'slideshow'
+    updaterStatus: '', // '' | 'checking' | 'downloading' | 'error'
     event: null,
     metrics: { total_programs: 0, scheduled_programs: 0, completed_programs: 0 },
     leaderboard: [],
@@ -233,6 +237,16 @@ function goHome() {
  * Render home dashboard
  */
 function renderHomeView() {
+    let updateBanner = '';
+    if (state.updaterStatus) {
+        let msg = '';
+        if (state.updaterStatus === 'checking') msg = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Checking for updates...';
+        else if (state.updaterStatus === 'downloading') msg = '<i class="fa-solid fa-cloud-arrow-down fa-bounce mr-2"></i> Downloading live update...';
+        else if (state.updaterStatus === 'error') msg = '<i class="fa-solid fa-circle-exclamation mr-2" style="color: var(--accent-rose);"></i> Update failed.';
+        
+        updateBanner = `<div class="login-alert alert-info" style="margin-bottom: 16px; font-size: 12px; justify-content: center; padding: 8px 12px; font-weight: 600;">${msg}</div>`;
+    }
+
     appEl.innerHTML = `
         <div class="home-container">
             <div class="home-card">
@@ -243,6 +257,8 @@ function renderHomeView() {
                     <h1>Kauzariyya Musabaqa</h1>
                     <p>Live Event Hub</p>
                 </div>
+                
+                ${updateBanner}
                 
                 <div class="home-menu">
                     <button id="launchSlideshowBtn" class="menu-item-btn">
@@ -363,6 +379,57 @@ function escapeHtml(str) {
 }
 
 /**
+ * Over-The-Air Update Check
+ */
+async function checkForOTAUpdates() {
+    const activeWebVersion = localStorage.getItem('active_web_version') || BUILTIN_WEB_VERSION;
+    
+    try {
+        state.updaterStatus = 'checking';
+        renderApp();
+        
+        const res = await fetch(`https://musabaqa.kauzariyya.com/uploads/app-web-version.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error('Failed to fetch version file');
+        
+        const latest = await res.json();
+        
+        if (latest && latest.version && latest.version !== activeWebVersion && latest.url) {
+            state.updaterStatus = 'downloading';
+            renderApp();
+            
+            // Download the web bundle zip file
+            const downloadResult = await CapacitorUpdater.download({
+                url: latest.url,
+                version: latest.version
+            });
+            
+            // Apply the bundle
+            await CapacitorUpdater.set({ id: downloadResult.id });
+            
+            // Save version to local storage
+            localStorage.setItem('active_web_version', latest.version);
+            
+            state.updaterStatus = '';
+            renderApp();
+            
+            // Reload page to run the new downloaded web assets!
+            window.location.reload();
+        } else {
+            state.updaterStatus = '';
+            renderApp();
+        }
+    } catch (err) {
+        console.warn('OTA update failed:', err);
+        state.updaterStatus = 'error';
+        renderApp();
+        setTimeout(() => {
+            state.updaterStatus = '';
+            renderApp();
+        }, 5000);
+    }
+}
+
+/**
  * Initial Load & Real-time Socket Setup
  */
 async function init() {
@@ -417,6 +484,9 @@ async function init() {
     } catch (err) {
         console.warn('Native App back button listener not available:', err);
     }
+
+    // 4. Over-The-Air Update Check
+    checkForOTAUpdates();
 }
 
 init();
