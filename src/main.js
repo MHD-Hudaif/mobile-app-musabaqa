@@ -1,9 +1,12 @@
 import './style.css';
 import { LiveSocketFetcher } from './socketFetcher.js';
-import { fetchAdminScoreboard, startLogin, registerUser, verifyLogin } from './api.js';
+import { fetchAdminScoreboard } from './api.js';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { App } from '@capacitor/app';
 
 // Application State
 const state = {
+    view: 'home', // 'home' | 'scoreboard' | 'slideshow'
     event: null,
     metrics: { total_programs: 0, scheduled_programs: 0, completed_programs: 0 },
     leaderboard: [],
@@ -12,16 +15,17 @@ const state = {
     activeTab: 'standings', // 'standings' | 'activity'
     socketStatus: { state: 'connecting', label: 'Connecting...' },
     auth: {
-        loggedIn: localStorage.getItem('user_logged_in') === 'true',
-        phone: localStorage.getItem('user_phone') || '',
-        name: localStorage.getItem('user_name') || '',
-        step: 'phone', // 'phone' | 'register' | 'pending' | 'verify'
+        loggedIn: true, // Temporarily bypassed/disabled login
+        phone: '',
+        name: '',
+        step: 'phone',
         error: '',
         info: '',
         maskedEmail: '',
         loading: false
     }
 };
+
 
 // Initialize Live Socket Fetcher
 const socketFetcher = new LiveSocketFetcher();
@@ -36,11 +40,14 @@ function renderHeader() {
     return `
         <header class="mobile-header">
             <div class="header-brand">
+                <button id="backToHomeBtn" class="back-btn" style="background: transparent; border: none; color: var(--text-main); font-size: 18px; cursor: pointer; padding-right: 8px; display: flex; align-items: center;" title="Back to Home">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
                 <div class="brand-icon">
                     <i class="fa-solid fa-trophy"></i>
                 </div>
                 <div>
-                    <div class="brand-title">Musabaqa Admin</div>
+                    <div class="brand-title">Kauzariyya Musabaqa</div>
                     <div class="brand-subtitle">${state.event ? escapeHtml(state.event.title) : 'Live Scoreboard'}</div>
                 </div>
             </div>
@@ -49,9 +56,6 @@ function renderHeader() {
                     <span class="pulse-dot"></span>
                     <span>${state.socketStatus.label}</span>
                 </div>
-                <button id="logoutBtn" class="logout-btn" title="Log Out">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                </button>
             </div>
         </header>
     `;
@@ -168,14 +172,136 @@ function renderNavigation() {
 }
 
 /**
- * Main App Render Loop
+ * Landscape Lock & Unlock helpers
  */
-function renderApp() {
-    if (!state.auth.loggedIn) {
-        renderLoginFlow();
-        return;
+async function lockLandscape() {
+    try {
+        await ScreenOrientation.lock({ orientation: 'landscape' });
+    } catch (e) {
+        console.warn('Native ScreenOrientation lock failed, trying standard API:', e);
+        try {
+            if (screen.orientation && screen.orientation.lock) {
+                await screen.orientation.lock('landscape');
+            }
+        } catch (wErr) {
+            console.warn('Standard ScreenOrientation lock failed:', wErr);
+        }
     }
+}
 
+async function unlockOrientation() {
+    try {
+        await ScreenOrientation.unlock();
+    } catch (e) {
+        console.warn('Native ScreenOrientation unlock failed, trying standard API:', e);
+        try {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+            }
+        } catch (wErr) {
+            console.warn('Standard ScreenOrientation unlock failed:', wErr);
+        }
+    }
+}
+
+/**
+ * Screen state switch handlers
+ */
+function showSlideshow() {
+    state.view = 'slideshow';
+    lockLandscape();
+    renderApp();
+}
+
+function exitSlideshow() {
+    state.view = 'home';
+    unlockOrientation();
+    renderApp();
+}
+
+function showScoreboard() {
+    state.view = 'scoreboard';
+    renderApp();
+}
+
+function goHome() {
+    state.view = 'home';
+    renderApp();
+}
+
+/**
+ * Render home dashboard
+ */
+function renderHomeView() {
+    appEl.innerHTML = `
+        <div class="home-container">
+            <div class="home-card">
+                <div class="home-brand">
+                    <div class="brand-logo">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <h1>Kauzariyya Musabaqa</h1>
+                    <p>Live Event Hub</p>
+                </div>
+                
+                <div class="home-menu">
+                    <button id="launchSlideshowBtn" class="menu-item-btn">
+                        <div class="menu-item-icon">
+                            <i class="fa-solid fa-tv"></i>
+                        </div>
+                        <div class="menu-item-content">
+                            <span class="menu-item-title">Launch Slideshow</span>
+                            <span class="menu-item-desc">Fullscreen presentation view (Auto-Landscape)</span>
+                        </div>
+                    </button>
+                    
+                    <button id="viewScoreboardBtn" class="menu-item-btn">
+                        <div class="menu-item-icon">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div class="menu-item-content">
+                            <span class="menu-item-title">Standings & Feed</span>
+                            <span class="menu-item-desc">Check overall standings and real-time updates</span>
+                        </div>
+                    </button>
+                </div>
+                
+                <div class="home-footer-status">
+                    <div class="socket-badge ${state.socketStatus.state}">
+                        <span class="pulse-dot"></span>
+                        <span>${state.socketStatus.label}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Attach menu click event listeners
+    document.getElementById('launchSlideshowBtn').addEventListener('click', showSlideshow);
+    document.getElementById('viewScoreboardBtn').addEventListener('click', showScoreboard);
+}
+
+/**
+ * Render fullscreen iframe slideshow
+ */
+function renderSlideshowView() {
+    appEl.innerHTML = `
+        <div class="slideshow-view">
+            <button id="closeSlideshowBtn" class="slideshow-back-btn">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span>Back to Home</span>
+            </button>
+            <iframe class="slideshow-iframe" src="https://musabaqa.kauzariyya.com/live-display/"></iframe>
+        </div>
+    `;
+
+    document.getElementById('closeSlideshowBtn').addEventListener('click', exitSlideshow);
+}
+
+/**
+ * Render scoreboard view (Original standings + recent activities)
+ */
+function renderScoreboardView() {
     appEl.innerHTML = `
         ${renderHeader()}
         ${renderMetrics()}
@@ -194,33 +320,31 @@ function renderApp() {
         ${renderNavigation()}
     `;
 
-    // Attach Tab Event Listeners
+    // Attach navigation Tab listeners
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             state.activeTab = btn.dataset.tab;
-            renderApp();
+            renderScoreboardView();
         });
     });
 
-    // Attach Logout Event Listener
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('user_logged_in');
-            localStorage.removeItem('user_phone');
-            localStorage.removeItem('user_name');
-            state.auth.loggedIn = false;
-            state.auth.phone = '';
-            state.auth.name = '';
-            state.auth.step = 'phone';
-            state.auth.error = '';
-            state.auth.info = '';
-            
-            // Disconnect socket fetcher
-            socketFetcher.disconnect();
-            
-            renderApp();
-        });
+    // Attach Back to Home button listener
+    const backToHomeBtn = document.getElementById('backToHomeBtn');
+    if (backToHomeBtn) {
+        backToHomeBtn.addEventListener('click', goHome);
+    }
+}
+
+/**
+ * Main App Render Loop
+ */
+function renderApp() {
+    if (state.view === 'home') {
+        renderHomeView();
+    } else if (state.view === 'slideshow') {
+        renderSlideshowView();
+    } else if (state.view === 'scoreboard') {
+        renderScoreboardView();
     }
 }
 
@@ -241,196 +365,7 @@ function escapeHtml(str) {
 /**
  * Initial Load & Real-time Socket Setup
  */
-function renderLoginFlow() {
-    let cardContent = '';
-
-    if (state.auth.step === 'phone') {
-        cardContent = `
-            <form id="phoneForm" class="login-form">
-                <div class="input-group">
-                    <label for="loginPhone">Phone Number</label>
-                    <input type="tel" id="loginPhone" placeholder="Enter mobile number" value="${escapeHtml(state.auth.phone)}" required ${state.auth.loading ? 'disabled' : ''}>
-                </div>
-                <button type="submit" class="btn-primary" ${state.auth.loading ? 'disabled' : ''}>
-                    ${state.auth.loading ? '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Processing...' : 'Continue'}
-                </button>
-            </form>
-        `;
-    } else if (state.auth.step === 'register') {
-        cardContent = `
-            <div class="login-info-msg">This phone number is not registered. Please enter your name and email to request admin approval.</div>
-            <form id="registerForm" class="login-form">
-                <div class="input-group">
-                    <label for="registerName">Full Name</label>
-                    <input type="text" id="registerName" placeholder="Enter your name" required ${state.auth.loading ? 'disabled' : ''}>
-                </div>
-                <div class="input-group">
-                    <label for="registerEmail">Email Address</label>
-                    <input type="email" id="registerEmail" placeholder="Enter your email" required ${state.auth.loading ? 'disabled' : ''}>
-                </div>
-                <button type="submit" class="btn-primary" ${state.auth.loading ? 'disabled' : ''}>
-                    ${state.auth.loading ? '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Requesting...' : 'Request Approval'}
-                </button>
-                <button type="button" class="btn-link back-to-login">Back to Login</button>
-            </form>
-        `;
-    } else if (state.auth.step === 'pending') {
-        cardContent = `
-            <div class="login-pending-state">
-                <i class="fa-solid fa-user-clock pending-icon"></i>
-                <h3>Approval Pending</h3>
-                <p>Your registration request has been submitted and is currently queued for admin approval.</p>
-                <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">Please contact the administrator to speed up approval.</p>
-                <button type="button" class="btn-primary back-to-login" style="margin-top: 20px;">Back to Login</button>
-            </div>
-        `;
-    } else if (state.auth.step === 'verify') {
-        cardContent = `
-            <div class="login-info-msg">We've sent a 6-digit OTP code to your registered email:<br><strong>${escapeHtml(state.auth.maskedEmail)}</strong></div>
-            <form id="verifyForm" class="login-form">
-                <div class="input-group">
-                    <label for="otpCode">Enter 6-Digit OTP</label>
-                    <input type="text" id="otpCode" placeholder="Enter OTP code" pattern="[0-9]{6}" maxlength="6" required ${state.auth.loading ? 'disabled' : ''}>
-                </div>
-                <button type="submit" class="btn-primary" ${state.auth.loading ? 'disabled' : ''}>
-                    ${state.auth.loading ? '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Verifying...' : 'Verify & Login'}
-                </button>
-                <button type="button" class="btn-link back-to-login">Back to Login</button>
-            </form>
-        `;
-    }
-
-    appEl.innerHTML = `
-        <div class="login-container">
-            <div class="login-card">
-                <div class="login-brand">
-                    <div class="brand-icon">
-                        <i class="fa-solid fa-trophy"></i>
-                    </div>
-                    <h2 class="brand-title">Kauzariyya Musabaqa</h2>
-                    <p class="brand-subtitle">Participant Portal</p>
-                </div>
-                
-                ${state.auth.error ? `<div class="login-alert alert-error"><i class="fa-solid fa-circle-exclamation mr-2"></i> ${escapeHtml(state.auth.error)}</div>` : ''}
-                ${state.auth.info ? `<div class="login-alert alert-info"><i class="fa-solid fa-circle-info mr-2"></i> ${escapeHtml(state.auth.info)}</div>` : ''}
-                
-                ${cardContent}
-            </div>
-        </div>
-    `;
-
-    attachLoginListeners();
-}
-
-function attachLoginListeners() {
-    document.querySelectorAll('.back-to-login').forEach(btn => {
-        btn.addEventListener('click', () => {
-            state.auth.step = 'phone';
-            state.auth.error = '';
-            state.auth.info = '';
-            renderApp();
-        });
-    });
-
-    const phoneForm = document.getElementById('phoneForm');
-    if (phoneForm) {
-        phoneForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const phoneInput = document.getElementById('loginPhone');
-            const phoneVal = phoneInput.value.trim();
-            if (!phoneVal) return;
-
-            state.auth.loading = true;
-            state.auth.error = '';
-            state.auth.info = '';
-            renderApp();
-
-            const res = await startLogin(phoneVal);
-            state.auth.loading = false;
-
-            if (res.status === 'otp_sent') {
-                state.auth.phone = phoneVal;
-                state.auth.maskedEmail = res.email_masked;
-                state.auth.step = 'verify';
-            } else if (res.status === 'new_user') {
-                state.auth.phone = phoneVal;
-                state.auth.step = 'register';
-            } else if (res.status === 'pending') {
-                state.auth.phone = phoneVal;
-                state.auth.step = 'pending';
-            } else {
-                state.auth.error = res.message || 'Login initiation failed.';
-            }
-            renderApp();
-        });
-    }
-
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nameInput = document.getElementById('registerName');
-            const emailInput = document.getElementById('registerEmail');
-            const nameVal = nameInput.value.trim();
-            const emailVal = emailInput.value.trim();
-
-            if (!nameVal || !emailVal) return;
-
-            state.auth.loading = true;
-            state.auth.error = '';
-            state.auth.info = '';
-            renderApp();
-
-            const res = await registerUser(nameVal, emailVal, state.auth.phone);
-            state.auth.loading = false;
-
-            if (res.status === 'queued') {
-                state.auth.step = 'pending';
-            } else {
-                state.auth.error = res.message || 'Registration request failed.';
-            }
-            renderApp();
-        });
-    }
-
-    const verifyForm = document.getElementById('verifyForm');
-    if (verifyForm) {
-        verifyForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const otpInput = document.getElementById('otpCode');
-            const otpVal = otpInput.value.trim();
-            if (!otpVal || otpVal.length !== 6) return;
-
-            state.auth.loading = true;
-            state.auth.error = '';
-            state.auth.info = '';
-            renderApp();
-
-            const res = await verifyLogin(state.auth.phone, otpVal);
-            state.auth.loading = false;
-
-            if (res.status === 'success') {
-                localStorage.setItem('user_logged_in', 'true');
-                localStorage.setItem('user_phone', res.user.phone);
-                localStorage.setItem('user_name', res.user.full_name);
-                state.auth.loggedIn = true;
-                state.auth.name = res.user.full_name;
-                
-                init();
-            } else {
-                state.auth.error = res.message || 'OTP verification failed.';
-                renderApp();
-            }
-        });
-    }
-}
-
 async function init() {
-    if (!state.auth.loggedIn) {
-        renderApp();
-        return;
-    }
-
     // 1. Initial REST API Fetch
     const initialData = await fetchAdminScoreboard();
     if (initialData && initialData.ok) {
@@ -467,6 +402,22 @@ async function init() {
 
         socketFetcher.connect();
     }
+
+    // 3. Hardware back button listener for Android
+    try {
+        App.addListener('backButton', () => {
+            if (state.view === 'slideshow') {
+                exitSlideshow();
+            } else if (state.view === 'scoreboard') {
+                goHome();
+            } else {
+                App.exitApp();
+            }
+        });
+    } catch (err) {
+        console.warn('Native App back button listener not available:', err);
+    }
 }
 
 init();
+
