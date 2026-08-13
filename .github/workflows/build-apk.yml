@@ -3,13 +3,14 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create/update releases
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build & Release Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -43,11 +44,24 @@ jobs:
       - name: Build Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Rename APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             kauzariyya-musabaqa.apk
+
+      - name: Delete existing latest release (if any)
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
         with:
-          name: kauzariyya-musabaqa-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          tag_name: latest
+          name: "Latest Build"
+          body: "Auto-built debug APK from the latest commit on `${{ github.ref_name }}`."
+          files: kauzariyya-musabaqa.apk
+          prerelease: true
