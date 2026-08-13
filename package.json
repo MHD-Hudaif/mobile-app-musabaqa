@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "cap:sync": "npm run build && npx cap sync android",
-    "cap:copy": "npx cap copy android",
+    "deploy": "vite build && node -e \"const fs=require('fs');const path=require('path');function cp(src,dst){if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});for(const f of fs.readdirSync(src)){const s=path.join(src,f),d=path.join(dst,f);fs.statSync(s).isDirectory()?cp(s,d):fs.copyFileSync(s,d);}}cp('dist','../web/mobile-app');console.log('Deployed dist/ → web/mobile-app/');\"",
+    "cap:sync": "npm run build && node ./node_modules/@capacitor/cli/bin/capacitor sync android",
+    "cap:copy": "node ./node_modules/@capacitor/cli/bin/capacitor copy android",
     "cap:assets": "capacitor-assets generate --android --splashBackgroundColor \"#0a0f1d\" --splashBackgroundColorDark \"#0a0f1d\""
   },
   "devDependencies": {

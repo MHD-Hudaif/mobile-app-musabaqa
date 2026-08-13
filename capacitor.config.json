@@ -3,7 +3,7 @@
   "appName": "Kauzariyya Musabaqa",
   "webDir": "dist",
   "server": {
-    "url": "https://musabaqa.kauzariyya.com/",
+    "url": "https://musabaqa.kauzariyya.com/mobile-app/",
     "errorPath": "error.html"
   }
 }
