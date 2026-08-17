@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   /* === Main Website Palette (matches intro.css) === */
   --bg-primary:     #fcfaf6;        /* Luxury Cream */
   --bg-card:        #ffffff;        /* White cards */
@@ -34,6 +34,19 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+a, button, .menu-item-btn, .nav-btn, .back-btn, .logout-btn {
+  outline: none;
 }
 
 body {

@@ -5,6 +5,15 @@ import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { App } from '@capacitor/app';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
+// Disable default browser context menus (long-press popups) except on text fields
+window.addEventListener('contextmenu', (e) => {
+    const target = e.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+    }
+    e.preventDefault();
+});
+
 const BUILTIN_WEB_VERSION = '1.0.0';
 
 // Application State
