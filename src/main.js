@@ -1,6 +1,6 @@
 import './style.css';
 import { LiveSocketFetcher } from './socketFetcher.js';
-import { fetchAdminScoreboard } from './api.js';
+import { fetchAdminScoreboard, getBaseUrl } from './api.js';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { App } from '@capacitor/app';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
@@ -316,7 +316,7 @@ function renderSlideshowView() {
                 <i class="fa-solid fa-arrow-left"></i>
                 <span>Back to Home</span>
             </button>
-            <iframe class="slideshow-iframe" src="https://musabaqa.kauzariyya.com/live-display/"></iframe>
+            <iframe class="slideshow-iframe" src="${getBaseUrl()}/live-display/"></iframe>
         </div>
     `;
 
@@ -397,7 +397,7 @@ async function checkForOTAUpdates() {
         state.updaterStatus = 'checking';
         renderApp();
         
-        const res = await fetch(`https://musabaqa.kauzariyya.com/uploads/app-web-version.json?t=${Date.now()}`);
+        const res = await fetch(`${getBaseUrl()}/uploads/app-web-version.json?t=${Date.now()}`);
         if (!res.ok) throw new Error('Failed to fetch version file');
         
         const latest = await res.json();

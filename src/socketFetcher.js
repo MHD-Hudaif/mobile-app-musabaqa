@@ -4,7 +4,14 @@
  * using https://musabaqa.kauzariyya.com as the live primary URL and fallback HTTP polling.
  */
 export class LiveSocketFetcher {
-    constructor(apiBaseUrl = 'https://musabaqa.kauzariyya.com') {
+    constructor(apiBaseUrl) {
+        if (!apiBaseUrl) {
+            if (window.location.pathname.includes('/mobile-app/')) {
+                apiBaseUrl = window.location.origin + window.location.pathname.split('/mobile-app/')[0];
+            } else {
+                apiBaseUrl = 'https://musabaqa.kauzariyya.com';
+            }
+        }
         this.apiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
         this.eventSource = null;
         this.pollingTimer = null;

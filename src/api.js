@@ -1,7 +1,14 @@
 /**
  * API Client for Kauzariyya Musabaqa Mobile App
  */
-const LIVE_API_BASE_URL = 'https://musabaqa.kauzariyya.com/api';
+export function getBaseUrl() {
+    if (window.location.pathname.includes('/mobile-app/')) {
+        return window.location.origin + window.location.pathname.split('/mobile-app/')[0];
+    }
+    return 'https://musabaqa.kauzariyya.com';
+}
+
+const LIVE_API_BASE_URL = `${getBaseUrl()}/api`;
 
 export async function fetchAdminScoreboard() {
     try {
